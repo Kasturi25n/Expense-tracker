@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { inTransaction } from '../db.js';
+import { seedNewUser } from '../seed.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -22,11 +24,12 @@ export function createAuthRouter(db, jwtSecret) {
     }
 
     const passwordHash = bcrypt.hashSync(password, 10);
-    const info = db
-      .prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)')
-      .run(email, passwordHash);
-
-    const userId = Number(info.lastInsertRowid);
+    const userId = inTransaction(db, () => {
+      const info = db.prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)').run(email, passwordHash);
+      const id = Number(info.lastInsertRowid);
+      seedNewUser(db, id);
+      return id;
+    });
     const token = jwt.sign({ userId }, jwtSecret, { expiresIn: '7d' });
     res.status(201).json({ token, user: { id: userId, email } });
   });

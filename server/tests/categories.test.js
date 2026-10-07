@@ -30,6 +30,17 @@ describe('categories', () => {
     expect(db.prepare('SELECT category_id FROM transactions WHERE id = ?').get(txId).category_id).toBeNull();
   });
 
+  it('creates income categories and reports each kind', async () => {
+    const res = await api.post('/api/categories', { name: 'Rental income', kind: 'income' });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ name: 'Rental income', kind: 'income' });
+    expect((await api.post('/api/categories', { name: 'Pets' })).body.kind).toBe('expense');
+  });
+
+  it('rejects an unknown kind', async () => {
+    expect((await api.post('/api/categories', { name: 'X', kind: 'savings' })).status).toBe(400);
+  });
+
   it("does not show one user's categories to another", async () => {
     await api.post('/api/categories', { name: 'Pets' });
     const other = client(app, (await signup(app, 'other@example.com')).token);
