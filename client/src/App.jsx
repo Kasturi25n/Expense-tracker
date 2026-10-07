@@ -9,6 +9,8 @@ import { Dashboard } from './pages/Dashboard.jsx';
 import { Transactions } from './pages/Transactions.jsx';
 import { Budgets } from './pages/Budgets.jsx';
 import { Categories } from './pages/Categories.jsx';
+import { Accounts } from './pages/Accounts.jsx';
+import { Recurring } from './pages/Recurring.jsx';
 import './App.css';
 
 const guard = (page) => <ProtectedRoute>{page}</ProtectedRoute>;
@@ -25,6 +27,8 @@ function App() {
             <Route path="/" element={guard(<Dashboard />)} />
             <Route path="/transactions" element={guard(<Transactions />)} />
             <Route path="/budgets" element={guard(<Budgets />)} />
+            <Route path="/recurring" element={guard(<Recurring />)} />
+            <Route path="/accounts" element={guard(<Accounts />)} />
             <Route path="/categories" element={guard(<Categories />)} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
