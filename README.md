@@ -31,16 +31,20 @@ npm --prefix client run dev   # UI on :5173
 npm test
 ```
 
-Runs the backend test suite (vitest + supertest) covering auth and CRUD.
+Runs the backend test suite (vitest + supertest) covering the migration, auth, accounts, transactions, rules, recurring items, budgets, summary and export.
 
 ## Features
 
-- Multi-user auth (register/login, JWT + bcryptjs, self-hosted, no paid APIs)
-- Expense CRUD with filtering by date range, category, and text search
-- Categories with color coding
-- Monthly budgets per category or overall, with over-budget warnings
-- Dashboard with total spend, category breakdown pie chart, and monthly trend line chart
-- CSV export of expenses
+- **Quick Add** from any page: amount + payee + Save. Category, account and time fill themselves in.
+- **Income, expenses and transfers** across accounts (cash, bank/UPI, credit card, wallet) with running balances. Card bill payments are transfers, so they're not double-counted.
+- **Auto-categorise rules** (starter rules for Swiggy, Zomato, Uber, Amazon, Netflix, Jio…), plus learning from your past payees.
+- **Recurring items** that add themselves (rent, salary, SIP) or wait for you to confirm the amount (electricity).
+- **Tags** like `goa-trip`, filters and search, CSV export.
+- **Budgets** per category or overall, with progress bars and over-budget warnings.
+- **Home** shows this month's money in/out, savings rate, where it went, a 6-month trend, balances and what's coming up.
+- Multi-user login (JWT + bcryptjs), self-hosted, no paid APIs.
+
+Existing databases upgrade automatically on first start: old expenses move into a "Cash" account.
 
 ## Notes
 

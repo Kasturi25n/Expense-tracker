@@ -1,14 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../api.js';
-import { formatMoney } from '../format.js';
-
-const currentMonth = new Date().toISOString().slice(0, 7);
+import { formatMoney, todayStr } from '../format.js';
 
 export function Budgets() {
   const { token } = useAuth();
   const [categories, setCategories] = useState([]);
-  const [month, setMonth] = useState(currentMonth);
+  const [month, setMonth] = useState(() => todayStr().slice(0, 7));
   const [status, setStatus] = useState([]);
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -19,21 +17,20 @@ export function Budgets() {
   }, [token, month]);
 
   useEffect(() => {
-    api.getCategories(token).then(setCategories).catch((e) => setError(e.message));
+    api.getCategories(token).then((c) => setCategories(c.filter((x) => x.kind === 'expense'))).catch((e) => setError(e.message));
   }, [token]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const categoryName = (id) => categories.find((c) => c.id === id)?.name || 'Overall';
+  const categoryName = (id) => (id === null ? 'All spending' : categories.find((c) => c.id === id)?.name ?? 'Deleted category');
 
-  const handleAdd = async (e) => {
+  const add = async (e) => {
     e.preventDefault();
     setError('');
     const value = parseFloat(amount);
-    if (Number.isNaN(value) || value <= 0) {
-      setError('Enter a positive budget amount');
-      return;
-    }
+    if (!(value > 0)) return setError('Enter a budget greater than 0');
     try {
       await api.createBudget(token, { month, amount: value, categoryId: categoryId ? Number(categoryId) : null });
       setAmount('');
@@ -43,38 +40,58 @@ export function Budgets() {
     }
   };
 
-  const handleDelete = async (id) => {
+  const remove = async (id) => {
+    if (!window.confirm('Remove this budget?')) return;
     await api.deleteBudget(token, id);
     load();
   };
 
   return (
     <div className="page">
-      <h1>Budgets</h1>
-      <div className="filters">
+      <div className="page-header">
+        <h1>Budgets</h1>
         <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
       </div>
-
-      <form className="category-form" onSubmit={handleAdd}>
-        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-          <option value="">Overall (all categories)</option>
-          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <input type="number" step="0.01" placeholder="Budget amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
-        <button type="submit">Set budget</button>
-      </form>
       {error && <p className="error">{error}</p>}
 
-      <ul className="budget-list">
-        {status.map((b) => (
-          <li key={b.id} className={b.overBudget ? 'over-budget' : ''}>
-            <span>{categoryName(b.category_id)}</span>
-            <span>{formatMoney(b.spent)} / {formatMoney(b.amount)}</span>
-            {b.overBudget && <span className="warning">Over budget!</span>}
-            <button onClick={() => handleDelete(b.id)}>Delete</button>
-          </li>
-        ))}
-      </ul>
+      <div className="card">
+        {status.length ? (
+          <ul className="list">
+            {status.map((b) => (
+              <li key={b.id}>
+                <div className="grow">
+                  <div className="row spread">
+                    <strong>{categoryName(b.category_id)}</strong>
+                    <span className={`amount ${b.overBudget ? 'negative' : ''}`}>{formatMoney(b.spent)} of {formatMoney(b.amount)}</span>
+                  </div>
+                  <div className="meter">
+                    <div className={`meter-fill ${b.overBudget ? 'over' : ''}`} style={{ width: `${Math.min(100, (b.spent / b.amount) * 100)}%` }} />
+                  </div>
+                  <small className="hint">{b.overBudget ? `Over by ${formatMoney(b.spent - b.amount)}` : `${formatMoney(b.amount - b.spent)} left`}</small>
+                </div>
+                <button className="icon" aria-label="Remove budget" onClick={() => remove(b.id)}>×</button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="hint">No budgets for this month yet. Start with your biggest category below.</p>
+        )}
+      </div>
+
+      <form className="card" onSubmit={add}>
+        <h2>Set a budget</h2>
+        <div className="form-grid">
+          <label>
+            Category
+            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+              <option value="">All spending</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+          <label>Limit for the month (₹)<input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+          <button type="submit">Save budget</button>
+        </div>
+      </form>
     </div>
   );
 }
