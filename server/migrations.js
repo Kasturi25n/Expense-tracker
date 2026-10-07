@@ -1,3 +1,5 @@
+import { seedStarterData } from './seed.js';
+
 const LEGACY_SCHEMA = `
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -116,7 +118,11 @@ function migrateToPart1(db) {
 
 // Index = version it upgrades from. Databases created before versioning report 0 and already
 // have the legacy tables, which the IF NOT EXISTS schema leaves untouched.
-const MIGRATIONS = [(db) => db.exec(LEGACY_SCHEMA), migrateToPart1];
+function seedExistingUsers(db) {
+  for (const { id } of db.prepare('SELECT id FROM users').all()) seedStarterData(db, id);
+}
+
+const MIGRATIONS = [(db) => db.exec(LEGACY_SCHEMA), migrateToPart1, seedExistingUsers];
 
 export function migrate(db) {
   const { user_version: current } = db.prepare('PRAGMA user_version').get();

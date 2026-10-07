@@ -55,7 +55,13 @@ export function advance(db, rule, nextDate) {
 
 export function materializeDue(db, userId, today) {
   const due = db
-    .prepare("SELECT * FROM recurring_rules WHERE user_id = ? AND active = 1 AND mode = 'auto' AND next_date <= ?")
+    .prepare(
+      `SELECT r.* FROM recurring_rules r
+       JOIN accounts a ON a.id = r.account_id
+       LEFT JOIN accounts ta ON ta.id = r.to_account_id
+       WHERE r.user_id = ? AND r.active = 1 AND r.mode = 'auto' AND r.next_date <= ?
+         AND a.archived = 0 AND (ta.id IS NULL OR ta.archived = 0)`
+    )
     .all(userId, today);
   if (!due.length) return;
   inTransaction(db, () => {

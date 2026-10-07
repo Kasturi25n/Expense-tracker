@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { inTransaction } from '../db.js';
-import { ValidationError, requireAmount, requireDate, requireDateTime, requireOneOf, validateMovement } from '../validate.js';
+import { ValidationError, ownedAccount, requireAmount, requireDate, requireDateTime, requireOneOf, validateMovement } from '../validate.js';
 import { FREQUENCIES, addDays, addPeriod, advance, occurrencesBetween, postOccurrence } from '../services/recurring.js';
 
 const MODES = ['auto', 'confirm'];
@@ -103,6 +103,8 @@ export function createRecurringRouter(db, today) {
   router.post('/:id/confirm', (req, res) => {
     const rule = dueRule(req);
     if (!rule) return res.status(404).json({ error: 'Repeating item not found' });
+    ownedAccount(db, req.userId, rule.account_id);
+    if (rule.to_account_id) ownedAccount(db, req.userId, rule.to_account_id, 'Destination account');
     const amount = req.body?.amount ?? rule.amount;
     requireAmount(amount);
     const occurredAt = req.body?.occurredAt ?? rule.next_date;

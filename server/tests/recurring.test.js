@@ -103,6 +103,23 @@ describe('recurring items', () => {
     expect((await other.del(`/api/recurring/${created.id}`)).status).toBe(404);
   });
 
+  it('does not post into an archived account', async () => {
+    const bank = (await api.post('/api/accounts', { name: 'HDFC', type: 'bank' })).body.id;
+    await api.post('/api/recurring', rule({ accountId: bank, nextDate: '2026-10-20' }));
+    await api.put(`/api/accounts/${bank}`, { name: 'HDFC', type: 'bank', openingBalance: 0, archived: true });
+    today = '2026-12-10';
+    expect(await txs()).toHaveLength(0);
+  });
+
+  it('refuses to confirm a bill into an archived account', async () => {
+    const bank = (await api.post('/api/accounts', { name: 'HDFC', type: 'bank' })).body.id;
+    const { id } = (await api.post('/api/recurring', rule({ accountId: bank, nextDate: '2026-10-01', mode: 'confirm' }))).body;
+    await api.put(`/api/accounts/${bank}`, { name: 'HDFC', type: 'bank', openingBalance: 0, archived: true });
+    const res = await api.post(`/api/recurring/${id}/confirm`, {});
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/archived/);
+  });
+
   it('clears the category from items when the category is deleted', async () => {
     const rent = catId(db, userId, 'Rent');
     const created = (await api.post('/api/recurring', rule({ nextDate: '2026-10-20' }))).body;

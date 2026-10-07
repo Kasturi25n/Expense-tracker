@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { ownedCategory } from '../validate.js';
 
 export function createBudgetsRouter(db) {
   const router = Router();
@@ -22,6 +23,7 @@ export function createBudgetsRouter(db) {
     if (typeof amount !== 'number' || Number.isNaN(amount) || amount <= 0) {
       return res.status(400).json({ error: 'A positive numeric amount is required' });
     }
+    if (categoryId !== undefined && categoryId !== null) ownedCategory(db, req.userId, categoryId, 'expense');
     const info = db
       .prepare('INSERT INTO budgets (user_id, category_id, month, amount) VALUES (?, ?, ?, ?)')
       .run(req.userId, categoryId ?? null, month, amount);

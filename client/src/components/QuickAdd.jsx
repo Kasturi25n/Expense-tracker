@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../api.js';
 import { nowLocalDateTime } from '../format.js';
@@ -31,6 +31,12 @@ export function QuickAdd({ initial, onClose, onSaved }) {
   const [categories, setCategories] = useState([]);
   const [payees, setPayees] = useState([]);
   const [categoryTouched, setCategoryTouched] = useState(isEdit);
+  // Lookups resolve after a delay; the ref lets a late response see a pick made in the meantime.
+  const touchedRef = useRef(isEdit);
+  const markTouched = (value) => {
+    touchedRef.current = value;
+    setCategoryTouched(value);
+  };
   const [showMore, setShowMore] = useState(isEdit);
   const [ruleOffer, setRuleOffer] = useState(null);
   const [error, setError] = useState('');
@@ -47,22 +53,25 @@ export function QuickAdd({ initial, onClose, onSaved }) {
 
   useEffect(() => {
     if (form.type === 'transfer') return undefined;
+    const requested = form.payee.trim();
     const timer = setTimeout(() => {
-      api.getPayees(token, form.payee.trim(), form.type)
+      api.getPayees(token, requested, form.type)
         .then(({ payees: list, suggestedCategoryId }) => {
           setPayees(list);
-          if (!categoryTouched && form.payee.trim()) setForm((f) => ({ ...f, categoryId: suggestedCategoryId ?? '' }));
+          setForm((f) =>
+            touchedRef.current || !requested || f.payee.trim() !== requested ? f : { ...f, categoryId: suggestedCategoryId ?? '' }
+          );
         })
         .catch(() => {});
     }, 250);
     return () => clearTimeout(timer);
-  }, [token, form.payee, form.type, categoryTouched]);
+  }, [token, form.payee, form.type]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
   const chooseType = (type) => {
     setForm((f) => ({ ...f, type, categoryId: '' }));
-    setCategoryTouched(false);
+    markTouched(false);
   };
 
   const save = async (e) => {
@@ -155,7 +164,7 @@ export function QuickAdd({ initial, onClose, onSaved }) {
             </label>
             <label>
               Category
-              <select value={form.categoryId} onChange={(e) => { setCategoryTouched(true); set('categoryId')(e); }}>
+              <select value={form.categoryId} onChange={(e) => { markTouched(true); set('categoryId')(e); }}>
                 <option value="">{isEdit ? 'Uncategorised' : 'Pick automatically'}</option>
                 {kindCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>

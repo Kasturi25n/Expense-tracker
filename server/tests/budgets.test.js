@@ -26,6 +26,16 @@ describe('budgets', () => {
     expect(status.find((b) => b.category_id === null)).toMatchObject({ spent: 60.3, overBudget: false });
   });
 
+  it("rejects categories that don't exist, belong to someone else, or are for income", async () => {
+    const budget = (categoryId) => api.post('/api/budgets', { categoryId, month: '2026-09', amount: 50 });
+    expect((await budget(99999)).status).toBe(400);
+    const other = await signup(app, 'other@example.com');
+    const otherFood = (await client(app, other.token).post('/api/categories', { name: 'Food' })).body.id;
+    expect((await budget(otherFood)).status).toBe(400);
+    const salary = db.prepare("SELECT id FROM categories WHERE user_id = ? AND name = 'Salary'").get(userId).id;
+    expect((await budget(salary)).status).toBe(400);
+  });
+
   it('rejects an invalid month format', async () => {
     expect((await api.post('/api/budgets', { month: 'not-a-month', amount: 50 })).status).toBe(400);
   });
