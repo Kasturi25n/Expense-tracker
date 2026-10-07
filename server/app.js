@@ -5,6 +5,7 @@ import { createAuthRouter } from './routes/auth.js';
 import { ValidationError } from './validate.js';
 import { createCategoriesRouter } from './routes/categories.js';
 import { createRulesRouter } from './routes/rules.js';
+import { createAccountsRouter } from './routes/accounts.js';
 import { createBudgetsRouter } from './routes/budgets.js';
 import { createExportRouter } from './routes/export.js';
 
@@ -18,6 +19,7 @@ export function createApp(db, jwtSecret) {
   app.use('/api/auth', createAuthRouter(db, jwtSecret));
   app.use('/api/categories', requireAuth, createCategoriesRouter(db));
   app.use('/api/rules', requireAuth, createRulesRouter(db));
+  app.use('/api/accounts', requireAuth, createAccountsRouter(db));
   app.use('/api/budgets', requireAuth, createBudgetsRouter(db));
   app.use('/api/export', requireAuth, createExportRouter(db));
 
