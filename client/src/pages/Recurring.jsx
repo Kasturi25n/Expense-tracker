@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useQuickAdd } from '../context/QuickAddContext.jsx';
 import { api } from '../api.js';
@@ -44,6 +45,7 @@ export function Recurring() {
   const [form, setForm] = useState(null);
   const [amounts, setAmounts] = useState({});
   const [error, setError] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const load = () =>
     Promise.all([api.getRecurring(token), api.getUpcoming(token, 7), api.getAccounts(token), api.getCategories(token)])
@@ -59,6 +61,21 @@ export function Recurring() {
   useEffect(() => {
     load();
   }, [token]);
+
+  useEffect(() => {
+    if (searchParams.get('new') !== '1' || !accounts.length) return;
+    const params = Object.fromEntries(searchParams);
+    const prefill = Object.fromEntries(
+      ['type', 'payee', 'amount', 'categoryId', 'accountId', 'frequency', 'nextDate'].filter((k) => params[k]).map((k) => [k, params[k]])
+    );
+    if (prefill.accountId) prefill.accountId = Number(prefill.accountId);
+    if (prefill.categoryId) prefill.categoryId = Number(prefill.categoryId);
+    if (prefill.type === 'income' && !prefill.categoryId) {
+      prefill.categoryId = categories.find((c) => c.kind === 'income' && c.name === 'Salary')?.id ?? '';
+    }
+    setForm({ ...blank(accounts.find((a) => !a.archived)?.id), ...prefill });
+    setSearchParams({}, { replace: true });
+  }, [searchParams, accounts, categories, setSearchParams]);
 
   const run = async (fn) => {
     setError('');

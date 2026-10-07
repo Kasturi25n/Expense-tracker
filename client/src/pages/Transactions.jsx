@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useQuickAdd } from '../context/QuickAddContext.jsx';
 import { api } from '../api.js';
@@ -22,7 +23,11 @@ function groupByDay(items) {
 export function Transactions() {
   const { token } = useAuth();
   const { open, version } = useQuickAdd();
-  const [filters, setFilters] = useState(NO_FILTERS);
+  const [searchParams] = useSearchParams();
+  const [filters, setFilters] = useState(() => ({
+    ...NO_FILTERS,
+    ...Object.fromEntries([...searchParams].filter(([key]) => key in NO_FILTERS)),
+  }));
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loaded, setLoaded] = useState(false);

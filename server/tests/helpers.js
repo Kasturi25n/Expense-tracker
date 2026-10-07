@@ -45,3 +45,19 @@ export const catId = (db, userId, name) =>
 
 export const cashId = (db, userId) =>
   db.prepare("SELECT id FROM accounts WHERE user_id = ? AND name = 'Cash'").get(userId).id;
+
+export async function insightsEnv(today = '2026-10-20') {
+  const clock = { today };
+  const { app, db } = freshApp({ today: () => clock.today });
+  const { token, userId } = await signup(app);
+  const api = client(app, token);
+  return {
+    app, db, userId, api, clock,
+    cash: cashId(db, userId),
+    id: (name) => catId(db, userId, name),
+    tx: (amount, occurredAt, extra = {}) => addTx(db, userId, { amount, occurredAt, ...extra }),
+    report: async (month = clock.today.slice(0, 7)) => (await api.get(`/api/insights?month=${month}`)).body,
+  };
+}
+
+export const pick = (report, prefix) => report.insights.filter((i) => i.id.startsWith(prefix));

@@ -10,6 +10,7 @@ import { Transactions } from './pages/Transactions.jsx';
 import { Budgets } from './pages/Budgets.jsx';
 import { Categories } from './pages/Categories.jsx';
 import { Accounts } from './pages/Accounts.jsx';
+import { Insights } from './pages/Insights.jsx';
 import { Recurring } from './pages/Recurring.jsx';
 import './App.css';
 
@@ -26,6 +27,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/" element={guard(<Dashboard />)} />
             <Route path="/transactions" element={guard(<Transactions />)} />
+            <Route path="/insights" element={guard(<Insights />)} />
             <Route path="/budgets" element={guard(<Budgets />)} />
             <Route path="/recurring" element={guard(<Recurring />)} />
             <Route path="/accounts" element={guard(<Accounts />)} />

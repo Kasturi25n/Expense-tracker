@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useQuickAdd } from '../context/QuickAddContext.jsx';
 import { api } from '../api.js';
 import { formatMoney, formatShortDate, monthRange } from '../format.js';
+import { InsightCard } from '../components/InsightCard.jsx';
 
 export function Dashboard() {
   const { token } = useAuth();
@@ -22,8 +23,9 @@ export function Dashboard() {
       api.getUpcoming(token, 7),
       api.getBudgetStatus(token, current.from.slice(0, 7)),
       api.getTransactions(token, { limit: 1 }),
+      api.getInsights(token, current.from.slice(0, 7)),
     ])
-      .then(([history, categories, recurring, upcoming, budgets, anyTx]) =>
+      .then(([history, categories, recurring, upcoming, budgets, anyTx, report]) =>
         setData({
           summary: history[history.length - 1],
           history: history.map((h, i) => ({ month: months[i].label, 'Money in': h.income, 'Money out': h.expense })),
@@ -32,6 +34,7 @@ export function Dashboard() {
           upcoming,
           budgets,
           hasTransactions: anyTx.total > 0,
+          insights: report.insights,
         })
       )
       .catch((e) => setError(e.message));
@@ -40,7 +43,7 @@ export function Dashboard() {
   if (error) return <div className="page"><p className="error">{error}</p></div>;
   if (!data) return <div className="page"><p className="hint">Loading…</p></div>;
 
-  const { summary, history, categories, pending, upcoming, budgets, hasTransactions } = data;
+  const { summary, history, categories, pending, upcoming, budgets, hasTransactions, insights } = data;
   if (!hasTransactions) {
     return (
       <div className="page">
@@ -52,6 +55,7 @@ export function Dashboard() {
             <Link to="/accounts">Set up your bank and card accounts</Link>
           </div>
         </div>
+        {insights.filter((i) => i.id === 'add-income').map((i) => <InsightCard key={i.id} insight={i} />)}
       </div>
     );
   }
@@ -84,6 +88,16 @@ export function Dashboard() {
           <Link to="/budgets">Budgets</Link>
         </div>
       ))}
+
+      {insights.length > 0 && (
+        <div className="card">
+          <div className="row spread">
+            <h2>Insights</h2>
+            <Link to="/insights">See all insights →</Link>
+          </div>
+          {insights.slice(0, 3).map((insight) => <InsightCard key={insight.id} insight={insight} />)}
+        </div>
+      )}
 
       <div className="stats">
         <div className="stat"><span>Money in</span><strong className="amount income">{formatMoney(summary.income)}</strong></div>

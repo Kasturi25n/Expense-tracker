@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../api.js';
 import { formatMoney, todayStr } from '../format.js';
@@ -11,9 +12,11 @@ export function Budgets() {
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [error, setError] = useState('');
+  const [income, setIncome] = useState(null);
 
   const load = useCallback(() => {
     api.getBudgetStatus(token, month).then(setStatus).catch((e) => setError(e.message));
+    api.getInsights(token, month).then((r) => setIncome(r.totals.expectedIncome)).catch((e) => setError(e.message));
   }, [token, month]);
 
   useEffect(() => {
@@ -46,6 +49,10 @@ export function Budgets() {
     load();
   };
 
+  const latest = new Map(status.map((b) => [b.category_id, b.amount]));
+  const budgeted = latest.has(null) ? latest.get(null) : [...latest.values()].reduce((a, b) => a + b, 0);
+  const unplanned = (income ?? 0) - budgeted;
+
   return (
     <div className="page">
       <div className="page-header">
@@ -53,6 +60,25 @@ export function Budgets() {
         <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
       </div>
       {error && <p className="error">{error}</p>}
+
+      {income !== null && (
+        <div className="card row spread">
+          {income > 0 ? (
+            <>
+              <span>Money in this month <strong>{formatMoney(income)}</strong> <small className="hint">incl. expected salary</small></span>
+              <span>Budgeted <strong>{formatMoney(budgeted)}</strong></span>
+              <span className={unplanned < 0 ? 'amount negative' : ''}>
+                {unplanned >= 0 ? <>Not budgeted <strong>{formatMoney(unplanned)}</strong></> : `Budgeted ${formatMoney(-unplanned)} more than you earn`}
+              </span>
+            </>
+          ) : (
+            <>
+              <span>Add your income to see how your budgets compare.</span>
+              <Link to={`/recurring?new=1&type=income&frequency=monthly&nextDate=${todayStr().slice(0, 7)}-01`}>Add income</Link>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="card">
         {status.length ? (

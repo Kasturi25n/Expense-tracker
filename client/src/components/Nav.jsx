@@ -11,6 +11,7 @@ export function Nav() {
       <div className="nav-links">
         <NavLink to="/" end>Home</NavLink>
         <NavLink to="/transactions">Transactions</NavLink>
+        <NavLink to="/insights">Insights</NavLink>
         <NavLink to="/budgets">Budgets</NavLink>
         <NavLink to="/recurring">Recurring</NavLink>
         <NavLink to="/accounts">Accounts</NavLink>

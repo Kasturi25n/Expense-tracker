@@ -42,6 +42,7 @@ Runs the backend test suite (vitest + supertest) covering the migration, auth, a
 - **Tags** like `goa-trip`, filters and search, CSV export.
 - **Budgets** per category or overall, with progress bars and over-budget warnings.
 - **Home** shows this month's money in/out, savings rate, where it went, a 6-month trend, balances and what's coming up.
+- **Insights** (Home + Insights page): pace and safe-to-spend per day, what changed vs last month and why, small leaks, unusual spends, untracked subscriptions, weekend and late-night habits, savings rate — all computed from your own data, no AI service.
 - Multi-user login (JWT + bcryptjs), self-hosted, no paid APIs.
 
 Existing databases upgrade automatically on first start: old expenses move into a "Cash" account.

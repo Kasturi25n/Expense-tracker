@@ -57,6 +57,7 @@ export const api = {
   skipRecurring: (token, id) => request(`/recurring/${id}/skip`, { method: 'POST', token }),
 
   getSummary: (token, from, to) => request(`/summary${query({ from, to })}`, { token }),
+  getInsights: (token, month) => request(`/insights${query({ month })}`, { token }),
 
   getBudgetStatus: (token, month) => request(`/budgets/status/${month}`, { token }),
   createBudget: (token, budget) => request('/budgets', { method: 'POST', body: budget, token }),

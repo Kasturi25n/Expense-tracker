@@ -104,3 +104,22 @@ fieldset.choices { border: none; padding: 0; margin: .75rem 0; display: flex; fl
 /* Auth */
 .auth-page { max-width: 360px; margin: 4rem auto; padding: 2rem; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); }
 .auth-page form { display: flex; flex-direction: column; gap: .75rem; }
+
+/* Insights */
+.insight { display: flex; align-items: flex-start; gap: .75rem; padding: .75rem 1rem; margin-bottom: .6rem; background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--primary); border-radius: var(--radius); }
+.insight.warning { border-left-color: #e8a317; }
+.insight.good { border-left-color: var(--income); }
+.insight p { margin: .2rem 0 0; }
+.insight-icon { flex: none; display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--primary); color: #fff; font-size: .8rem; font-weight: 700; }
+.insight.warning .insight-icon { background: #e8a317; }
+.insight.good .insight-icon { background: var(--income); }
+.insight-action { align-self: center; white-space: nowrap; color: var(--primary); font-weight: 600; text-decoration: none; }
+.month-switch { display: flex; align-items: center; gap: .5rem; }
+.delta { display: block; font-size: .8rem; color: var(--muted); }
+td .delta { display: inline; }
+.delta.good { color: var(--income); }
+.delta.bad { color: var(--danger); }
+table.report { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+table.report th, table.report td { padding: .45rem .5rem; text-align: right; border-bottom: 1px solid var(--border); }
+table.report th:first-child, table.report td:first-child { text-align: left; }
+table.report th { font-size: .8rem; color: var(--muted); font-weight: 500; }
