@@ -47,7 +47,7 @@ export function createCategoriesRouter(db) {
     if (!existing) {
       return res.status(404).json({ error: 'Category not found' });
     }
-    db.prepare('UPDATE expenses SET category_id = NULL WHERE category_id = ?').run(req.params.id);
+    db.prepare('UPDATE transactions SET category_id = NULL WHERE category_id = ?').run(req.params.id);
     db.prepare('DELETE FROM budgets WHERE category_id = ?').run(req.params.id);
     db.prepare('DELETE FROM categories WHERE id = ?').run(req.params.id);
     res.status(204).end();

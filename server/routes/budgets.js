@@ -50,19 +50,17 @@ export function createBudgetsRouter(db) {
     const budgets = db.prepare('SELECT * FROM budgets WHERE user_id = ? AND month = ?').all(req.userId, month);
     const spendByCategory = db
       .prepare(
-        `SELECT category_id, SUM(amount) as total FROM expenses
-         WHERE user_id = ? AND date LIKE ? GROUP BY category_id`
+        `SELECT category_id, SUM(amount) AS total FROM transactions
+         WHERE user_id = ? AND type = 'expense' AND occurred_at LIKE ? GROUP BY category_id`
       )
       .all(req.userId, `${month}%`);
     const spendMap = new Map(spendByCategory.map((r) => [r.category_id, r.total]));
     const overallSpend = spendByCategory.reduce((sum, r) => sum + r.total, 0);
+    const round = (n) => Math.round(n * 100) / 100;
 
-    const results = budgets.map((b) => ({
-      ...b,
-      spent: b.category_id === null ? overallSpend : spendMap.get(b.category_id) || 0,
-    }));
-    results.forEach((r) => {
-      r.overBudget = r.spent > r.amount;
+    const results = budgets.map((b) => {
+      const spent = round(b.category_id === null ? overallSpend : spendMap.get(b.category_id) || 0);
+      return { ...b, spent, overBudget: spent > b.amount };
     });
 
     res.json(results);
