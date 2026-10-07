@@ -36,6 +36,7 @@ export function createCategoriesRouter(db) {
     inTransaction(db, () => {
       db.prepare('UPDATE transactions SET category_id = NULL WHERE category_id = ?').run(req.params.id);
       db.prepare('DELETE FROM budgets WHERE category_id = ?').run(req.params.id);
+      db.prepare('DELETE FROM category_rules WHERE category_id = ?').run(req.params.id);
       db.prepare('DELETE FROM categories WHERE id = ?').run(req.params.id);
     });
     res.status(204).end();
