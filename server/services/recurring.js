@@ -1,3 +1,5 @@
+import { inTransaction } from '../db.js';
+
 export const FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'yearly'];
 const MONTHS_PER_PERIOD = { monthly: 1, quarterly: 3, yearly: 12 };
 
@@ -34,4 +36,33 @@ export function occurrencesBetween(rule, until) {
 export function todayLocal() {
   const now = new Date();
   return toDateStr(now.getFullYear(), now.getMonth() + 1, now.getDate());
+}
+
+export function postOccurrence(db, rule, occurredAt, amount) {
+  const info = db
+    .prepare(
+      `INSERT INTO transactions (user_id, type, amount, occurred_at, account_id, to_account_id, category_id, payee, note, recurring_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(rule.user_id, rule.type, amount, occurredAt, rule.account_id, rule.to_account_id, rule.category_id, rule.payee, rule.note, rule.id);
+  return Number(info.lastInsertRowid);
+}
+
+export function advance(db, rule, nextDate) {
+  const ended = Boolean(rule.end_date) && nextDate > rule.end_date;
+  db.prepare('UPDATE recurring_rules SET next_date = ?, active = ? WHERE id = ?').run(nextDate, ended ? 0 : 1, rule.id);
+}
+
+export function materializeDue(db, userId, today) {
+  const due = db
+    .prepare("SELECT * FROM recurring_rules WHERE user_id = ? AND active = 1 AND mode = 'auto' AND next_date <= ?")
+    .all(userId, today);
+  if (!due.length) return;
+  inTransaction(db, () => {
+    for (const rule of due) {
+      const { dates, nextDate } = occurrencesBetween(rule, today);
+      for (const date of dates) postOccurrence(db, rule, date, rule.amount);
+      advance(db, rule, nextDate);
+    }
+  });
 }

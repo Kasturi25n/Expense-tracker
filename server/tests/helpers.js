@@ -2,9 +2,9 @@ import request from 'supertest';
 import { createDb } from '../db.js';
 import { createApp } from '../app.js';
 
-export function freshApp() {
+export function freshApp(options = {}) {
   const db = createDb(':memory:');
-  return { app: createApp(db, 'test-secret'), db };
+  return { app: createApp(db, 'test-secret', options), db };
 }
 
 export async function signup(app, email = 'user@example.com', password = 'password123') {
