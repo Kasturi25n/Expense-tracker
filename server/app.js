@@ -9,6 +9,7 @@ import { createRulesRouter } from './routes/rules.js';
 import { createAccountsRouter } from './routes/accounts.js';
 import { createTransactionsRouter } from './routes/transactions.js';
 import { createRecurringRouter } from './routes/recurring.js';
+import { createSummaryRouter } from './routes/summary.js';
 import { createBudgetsRouter } from './routes/budgets.js';
 import { createExportRouter } from './routes/export.js';
 
@@ -31,6 +32,7 @@ export function createApp(db, jwtSecret, { today = todayLocal } = {}) {
   app.use('/api/accounts', ...authed, createAccountsRouter(db));
   app.use('/api/transactions', ...authed, createTransactionsRouter(db));
   app.use('/api/recurring', ...authed, createRecurringRouter(db, today));
+  app.use('/api/summary', ...authed, createSummaryRouter(db));
   app.use('/api/budgets', ...authed, createBudgetsRouter(db));
   app.use('/api/export', ...authed, createExportRouter(db));
 
