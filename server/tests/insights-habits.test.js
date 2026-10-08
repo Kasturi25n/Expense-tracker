@@ -84,6 +84,13 @@ describe('savings and income', () => {
     });
   });
 
+  it('rounds the savings rate down so it never claims 100% too early', async () => {
+    const env = await insightsEnv();
+    env.tx(50000, '2026-10-01', { type: 'income' });
+    env.tx(250, '2026-10-05');
+    expect(pick(await env.report(), 'savings')[0].title).toBe('You saved 99% of your income so far (₹49,750)');
+  });
+
   it('gives a neutral note for a low rate in a past month', async () => {
     const env = await insightsEnv();
     env.tx(50000, '2026-09-01', { type: 'income' });

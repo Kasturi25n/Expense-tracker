@@ -80,26 +80,28 @@ function monthContext(month, today) {
 // Mid-month, "last month" means the same days of last month, so comparisons are like-for-like.
 const previousUpTo = (ctx) => (ctx.isCurrent ? ctx.prev.sameDay : ctx.prev.end);
 
-function txRows(db, userId, type, from, to) {
+// `who` is { who, accountId }; accountId null means all accounts.
+function txRows(db, who, type, from, to) {
   return db
     .prepare(
       `SELECT id, amount, occurred_at, category_id, account_id, payee, recurring_id FROM transactions
-       WHERE user_id = ? AND type = ? AND substr(occurred_at, 1, 10) BETWEEN ? AND ? ORDER BY occurred_at, id`
+       WHERE user_id = ? AND type = ? AND substr(occurred_at, 1, 10) BETWEEN ? AND ?
+         AND (? IS NULL OR account_id = ?) ORDER BY occurred_at, id`
     )
-    .all(userId, type, from, to);
+    .all(who.userId, type, from, to, who.accountId, who.accountId);
 }
-const expenses = (db, userId, from, to) => txRows(db, userId, 'expense', from, to);
+const expenses = (db, who, from, to) => txRows(db, who, 'expense', from, to);
 
-function totalsFor(db, userId, from, to) {
-  const income = sum(txRows(db, userId, 'income', from, to));
-  const expense = sum(expenses(db, userId, from, to));
+function totalsFor(db, who, from, to) {
+  const income = sum(txRows(db, who, 'income', from, to));
+  const expense = sum(expenses(db, who, from, to));
   return { income: round(income), expense: round(expense), net: round(income - expense) };
 }
 
-function categoryTable(db, userId, ctx) {
+function categoryTable(db, who, ctx) {
   const totalsBy = (from, to) => {
     const map = new Map();
-    for (const r of expenses(db, userId, from, to)) map.set(r.category_id, (map.get(r.category_id) ?? 0) + r.amount);
+    for (const r of expenses(db, who, from, to)) map.set(r.category_id, (map.get(r.category_id) ?? 0) + r.amount);
     return map;
   };
   const now = totalsBy(ctx.start, ctx.upto);
@@ -115,41 +117,44 @@ function categoryTable(db, userId, ctx) {
     .sort((a, b) => b.total - a.total || b.previous - a.previous);
 }
 
-function topPayees(db, userId, ctx) {
-  return [...groupBy(expenses(db, userId, ctx.start, ctx.upto).filter((r) => r.payee), payeeKey).values()]
+function topPayees(db, who, ctx) {
+  return [...groupBy(expenses(db, who, ctx.start, ctx.upto).filter((r) => r.payee), payeeKey).values()]
     .map((list) => ({ payee: list[list.length - 1].payee, total: round(sum(list)), count: list.length }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 5);
 }
 
-function upcomingOccurrences(db, userId, ctx) {
+function upcomingOccurrences(db, who, ctx) {
   // Pending confirm-bills (dated ≤ today) are still to be paid, so they count as upcoming.
   return db
     .prepare(
       `SELECT r.* FROM recurring_rules r
        JOIN accounts a ON a.id = r.account_id
        LEFT JOIN accounts ta ON ta.id = r.to_account_id
-       WHERE r.user_id = ? AND r.active = 1 AND a.archived = 0 AND (ta.id IS NULL OR ta.archived = 0)`
+       WHERE r.user_id = ? AND r.active = 1 AND a.archived = 0 AND (ta.id IS NULL OR ta.archived = 0)
+         AND (? IS NULL OR r.account_id = ?)`
     )
-    .all(userId)
+    .all(who.userId, who.accountId, who.accountId)
     .flatMap((r) => occurrencesBetween(r, ctx.end).dates.map((date) => ({ type: r.type, amount: r.amount, category_id: r.category_id, date })));
 }
 
-function budgetsFor(db, userId, month) {
+function budgetsFor(db, who, month) {
   let overall = null;
   const byCategory = new Map();
-  for (const b of db.prepare('SELECT category_id, amount FROM budgets WHERE user_id = ? AND month = ? ORDER BY id').all(userId, month)) {
+  // Budgets cover all accounts, so they don't apply to a single-account view.
+  if (who.accountId) return { overall, byCategory };
+  for (const b of db.prepare('SELECT category_id, amount FROM budgets WHERE user_id = ? AND month = ? ORDER BY id').all(who.userId, month)) {
     if (b.category_id === null) overall = b.amount;
     else byCategory.set(b.category_id, b.amount);
   }
   return { overall, byCategory };
 }
 
-function paceReport(db, userId, ctx, names) {
+function paceReport(db, who, ctx, names) {
   if (!ctx.isCurrent || ctx.dayOfMonth < PACE_MIN_DAY) return { pace: null, insights: [] };
 
-  const rows = expenses(db, userId, ctx.start, ctx.today);
-  const upcoming = upcomingOccurrences(db, userId, ctx);
+  const rows = expenses(db, who, ctx.start, ctx.today);
+  const upcoming = upcomingOccurrences(db, who, ctx);
   const daysRemaining = ctx.daysInMonth - ctx.dayOfMonth;
   const daysLeft = daysRemaining + 1;
   const project = (list, fixed) => sum(list) + (sum(list.filter((r) => r.recurring_id === null)) / ctx.dayOfMonth) * daysRemaining + fixed;
@@ -159,7 +164,7 @@ function paceReport(db, userId, ctx, names) {
   if (spentSoFar === 0 && upcomingFixed === 0) return { pace: null, insights: [] };
   const forecast = round(project(rows, upcomingFixed));
 
-  const budgets = budgetsFor(db, userId, ctx.month);
+  const budgets = budgetsFor(db, who, ctx.month);
   let limit = null;
   let limitSource = null;
   let limitLabel = '';
@@ -170,7 +175,7 @@ function paceReport(db, userId, ctx, names) {
     [limit, limitSource] = [[...budgets.byCategory.values()].reduce((a, b) => a + b, 0), 'category-budgets'];
     limitLabel = `your ${fm(limit)} of budgets`;
   } else {
-    const income = sum(txRows(db, userId, 'income', ctx.start, ctx.end)) + sum(upcoming.filter((o) => o.type === 'income'));
+    const income = sum(txRows(db, who, 'income', ctx.start, ctx.end)) + sum(upcoming.filter((o) => o.type === 'income'));
     if (income > 0) {
       [limit, limitSource] = [income, 'income'];
       limitLabel = `your ${fm(limit)} income`;
@@ -239,12 +244,12 @@ function mainPayee(nowRows, beforeRows, delta) {
   return best.prior === 0 ? `${best.name}: ${payments}, none before` : `${best.name}: ${payments} vs ${best.prior}`;
 }
 
-function changeInsights(db, userId, ctx, names) {
-  const nowBy = groupBy(expenses(db, userId, ctx.start, ctx.upto).filter((r) => r.category_id !== null), (r) => r.category_id);
-  const beforeBy = groupBy(expenses(db, userId, ctx.prev.start, previousUpTo(ctx)).filter((r) => r.category_id !== null), (r) => r.category_id);
+function changeInsights(db, who, ctx, names) {
+  const nowBy = groupBy(expenses(db, who, ctx.start, ctx.upto).filter((r) => r.category_id !== null), (r) => r.category_id);
+  const beforeBy = groupBy(expenses(db, who, ctx.prev.start, previousUpTo(ctx)).filter((r) => r.category_id !== null), (r) => r.category_id);
   // Without any earlier spending there is no baseline, so "new spending" would flag everything.
   const hasHistory = Boolean(
-    db.prepare("SELECT 1 FROM transactions WHERE user_id = ? AND type = 'expense' AND substr(occurred_at, 1, 10) < ? LIMIT 1").get(userId, ctx.start)
+    db.prepare("SELECT 1 FROM transactions WHERE user_id = ? AND type = 'expense' AND substr(occurred_at, 1, 10) < ? LIMIT 1").get(who.userId, ctx.start)
   );
 
   const changes = [];
@@ -287,8 +292,8 @@ function changeInsights(db, userId, ctx, names) {
   return insights;
 }
 
-function leakInsights(db, userId, ctx) {
-  const small = expenses(db, userId, ctx.start, ctx.upto).filter((r) => r.amount < LEAK_MAX_AMOUNT);
+function leakInsights(db, who, ctx) {
+  const small = expenses(db, who, ctx.start, ctx.upto).filter((r) => r.amount < LEAK_MAX_AMOUNT);
   const total = sum(small);
   if (small.length < LEAK_MIN_COUNT || total < LEAK_MIN_TOTAL) return [];
   const top = biggestGroup(small.filter((r) => r.payee), payeeKey);
@@ -299,16 +304,16 @@ function leakInsights(db, userId, ctx) {
   }];
 }
 
-function unusualInsights(db, userId, ctx, names) {
+function unusualInsights(db, who, ctx, names) {
   const history = db.prepare(
     `SELECT amount FROM transactions WHERE user_id = ? AND type = 'expense' AND category_id = ?
      AND substr(occurred_at, 1, 10) >= ? AND substr(occurred_at, 1, 10) < ?`
   );
   const found = [];
-  for (const r of expenses(db, userId, ctx.start, ctx.upto)) {
+  for (const r of expenses(db, who, ctx.start, ctx.upto)) {
     if (r.amount < UNUSUAL_MIN_AMOUNT || r.category_id === null) continue;
     const day = r.occurred_at.slice(0, 10);
-    const past = history.all(userId, r.category_id, addDays(day, -UNUSUAL_LOOKBACK_DAYS), day).map((h) => h.amount);
+    const past = history.all(who.userId, r.category_id, addDays(day, -UNUSUAL_LOOKBACK_DAYS), day).map((h) => h.amount);
     if (past.length < UNUSUAL_MIN_HISTORY) continue;
     const usual = median(past);
     if (r.amount >= UNUSUAL_MULTIPLE * usual) found.push({ r, usual, multiple: r.amount / usual });
@@ -323,10 +328,10 @@ function unusualInsights(db, userId, ctx, names) {
     }));
 }
 
-function subscriptionInsights(db, userId, ctx) {
-  const rows = expenses(db, userId, `${shiftMonth(ctx.month, -3)}-01`, ctx.upto).filter((r) => r.payee);
+function subscriptionInsights(db, who, ctx) {
+  const rows = expenses(db, who, `${shiftMonth(ctx.month, -3)}-01`, ctx.upto).filter((r) => r.payee);
   const tracked = new Set(
-    db.prepare("SELECT lower(trim(payee)) AS payee FROM recurring_rules WHERE user_id = ? AND payee != ''").all(userId).map((x) => x.payee)
+    db.prepare("SELECT lower(trim(payee)) AS payee FROM recurring_rules WHERE user_id = ? AND payee != ''").all(who.userId).map((x) => x.payee)
   );
   const found = [];
   for (const [key, list] of groupBy(rows, payeeKey)) {
@@ -364,11 +369,11 @@ const isWeekend = (s) => {
   return day === 0 || day === 6;
 };
 
-function habitInsights(db, userId, ctx) {
+function habitInsights(db, who, ctx) {
   const insights = [];
 
   const from = addDays(ctx.upto, -(HABIT_LOOKBACK_DAYS - 1));
-  const rows = expenses(db, userId, from, ctx.upto).filter((r) => r.recurring_id === null);
+  const rows = expenses(db, who, from, ctx.upto).filter((r) => r.recurring_id === null);
   let weekendDays = 0;
   let weekdayDays = 0;
   for (let d = from; d <= ctx.upto; d = addDays(d, 1)) {
@@ -386,7 +391,7 @@ function habitInsights(db, userId, ctx) {
     });
   }
 
-  const late = expenses(db, userId, ctx.start, ctx.upto).filter((r) => {
+  const late = expenses(db, who, ctx.start, ctx.upto).filter((r) => {
     if (!r.occurred_at.includes('T')) return false;
     const hour = Number(r.occurred_at.slice(11, 13));
     return hour >= 23 || hour < 4;
@@ -403,10 +408,11 @@ function habitInsights(db, userId, ctx) {
   return insights;
 }
 
-function savingsInsights(db, userId, ctx) {
-  const income = sum(txRows(db, userId, 'income', ctx.start, ctx.upto));
+function savingsInsights(db, who, ctx) {
+  const income = sum(txRows(db, who, 'income', ctx.start, ctx.upto));
   if (income === 0) {
-    const hasIncomeItem = db.prepare("SELECT 1 FROM recurring_rules WHERE user_id = ? AND type = 'income' AND active = 1 LIMIT 1").get(userId);
+    if (who.accountId) return [];
+    const hasIncomeItem = db.prepare("SELECT 1 FROM recurring_rules WHERE user_id = ? AND type = 'income' AND active = 1 LIMIT 1").get(who.userId);
     if (hasIncomeItem) return [];
     // Start from this month's 1st so an old report can't backfill months of salary.
     const params = new URLSearchParams({ new: '1', type: 'income', frequency: 'monthly', nextDate: `${ctx.today.slice(0, 7)}-01` });
@@ -418,7 +424,7 @@ function savingsInsights(db, userId, ctx) {
     }];
   }
 
-  const expense = sum(expenses(db, userId, ctx.start, ctx.upto));
+  const expense = sum(expenses(db, who, ctx.start, ctx.upto));
   const net = income - expense;
   const soFar = ctx.isCurrent ? ' so far' : '';
   if (net < 0) {
@@ -432,11 +438,12 @@ function savingsInsights(db, userId, ctx) {
   const pastRates = [1, 2, 3]
     .map((n) => shiftMonth(ctx.month, -n))
     .map((m) => {
-      const monthIncome = sum(txRows(db, userId, 'income', `${m}-01`, monthEnd(m)));
-      return monthIncome > 0 ? (monthIncome - sum(expenses(db, userId, `${m}-01`, monthEnd(m)))) / monthIncome : null;
+      const monthIncome = sum(txRows(db, who, 'income', `${m}-01`, monthEnd(m)));
+      return monthIncome > 0 ? (monthIncome - sum(expenses(db, who, `${m}-01`, monthEnd(m)))) / monthIncome : null;
     })
     .filter((rate) => rate !== null);
-  const pct = Math.round((net / income) * 100);
+  // Round down so 99.5% reads as 99%, never a premature 100%.
+  const pct = Math.floor((net / income) * 100);
   const avgPct = pastRates.length ? Math.round((pastRates.reduce((a, b) => a + b, 0) / pastRates.length) * 100) : null;
   const span = `the last ${pastRates.length} ${pastRates.length === 1 ? 'month' : 'months'}`;
   const title = `You saved ${pct}% of your income${soFar} (${fm(net)})`;
@@ -453,27 +460,28 @@ function savingsInsights(db, userId, ctx) {
 
 const DETECTORS = [changeInsights, leakInsights, unusualInsights, subscriptionInsights, habitInsights, savingsInsights];
 
-export function buildMonthReport(db, userId, month, today) {
+export function buildMonthReport(db, userId, month, today, accountId = null) {
+  const who = { userId, accountId };
   const ctx = monthContext(month, today);
   const names = new Map(db.prepare('SELECT id, name FROM categories WHERE user_id = ?').all(userId).map((c) => [c.id, c.name]));
-  const { pace, insights: paceInsights } = paceReport(db, userId, ctx, names);
-  const insights = [...paceInsights, ...DETECTORS.flatMap((detect) => detect(db, userId, ctx, names))]
+  const { pace, insights: paceInsights } = paceReport(db, who, ctx, names);
+  const insights = [...paceInsights, ...DETECTORS.flatMap((detect) => detect(db, who, ctx, names))]
     .sort((x, y) => TONE_ORDER[x.tone] - TONE_ORDER[y.tone] || y.impact - x.impact)
     .map(({ impact, ...insight }) => insight);
   return {
     month,
     isCurrentMonth: ctx.isCurrent,
     totals: {
-      ...totalsFor(db, userId, ctx.start, ctx.upto),
+      ...totalsFor(db, who, ctx.start, ctx.upto),
       expectedIncome: round(
-        sum(txRows(db, userId, 'income', ctx.start, ctx.end)) +
-          sum(upcomingOccurrences(db, userId, ctx).filter((o) => o.type === 'income' && o.date >= ctx.start))
+        sum(txRows(db, who, 'income', ctx.start, ctx.end)) +
+          sum(upcomingOccurrences(db, who, ctx).filter((o) => o.type === 'income' && o.date >= ctx.start))
       ),
-      previous: totalsFor(db, userId, ctx.prev.start, previousUpTo(ctx)),
+      previous: totalsFor(db, who, ctx.prev.start, previousUpTo(ctx)),
     },
     pace,
     insights,
-    categories: categoryTable(db, userId, ctx),
-    topPayees: topPayees(db, userId, ctx),
+    categories: categoryTable(db, who, ctx),
+    topPayees: topPayees(db, who, ctx),
   };
 }

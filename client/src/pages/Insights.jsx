@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useQuickAdd } from '../context/QuickAddContext.jsx';
 import { api } from '../api.js';
 import { InsightCard } from '../components/InsightCard.jsx';
+import { AccountPicker, scopeLabel } from '../components/AccountPicker.jsx';
 import { formatMoney, todayStr } from '../format.js';
 
 const LIMIT_LABELS = { budget: 'your budget', 'category-budgets': 'your category budgets', income: 'your income' };
@@ -34,18 +35,21 @@ export function Insights() {
   const { version } = useQuickAdd();
   const thisMonth = todayStr().slice(0, 7);
   const [month, setMonth] = useState(thisMonth);
+  const [accountId, setAccountId] = useState('');
   const [report, setReport] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
     api.getCategories(token).then(setCategories).catch((e) => setError(e.message));
+    api.getAccounts(token).then((list) => setAccounts(list.filter((a) => !a.archived))).catch((e) => setError(e.message));
   }, [token]);
 
   useEffect(() => {
     setReport(null);
-    api.getInsights(token, month).then(setReport).catch((e) => setError(e.message));
-  }, [token, month, version]);
+    api.getInsights(token, month, accountId).then(setReport).catch((e) => setError(e.message));
+  }, [token, month, version, accountId]);
 
   const categoryName = (id) => categories.find((c) => c.id === id)?.name ?? 'Uncategorised';
 
@@ -54,11 +58,13 @@ export function Insights() {
       <div className="page-header">
         <h1>Insights</h1>
         <div className="month-switch">
+          <AccountPicker accounts={accounts} value={accountId} onChange={setAccountId} />
           <button className="secondary" aria-label="Previous month" onClick={() => setMonth(shiftMonth(month, -1))}>←</button>
           <strong>{monthLabel(month)}</strong>
           <button className="secondary" aria-label="Next month" disabled={month >= thisMonth} onClick={() => setMonth(shiftMonth(month, 1))}>→</button>
         </div>
       </div>
+      {scopeLabel(accounts, accountId) && <p className="hint scope">{scopeLabel(accounts, accountId)}</p>}
       {error && <p className="error">{error}</p>}
       {!report ? <p className="hint">Loading…</p> : <ReportBody report={report} categoryName={categoryName} />}
     </div>
@@ -86,7 +92,7 @@ function ReportBody({ report, categoryName }) {
         <div className="stat">
           <span>{totals.net >= 0 ? 'Saved' : 'Overspent'}</span>
           <strong className={totals.net < 0 ? 'amount negative' : ''}>{formatMoney(Math.abs(totals.net))}</strong>
-          {totals.income > 0 && <small>{Math.round((totals.net / totals.income) * 100)}% of what came in</small>}
+          {totals.income > 0 && <small>{Math.trunc((totals.net / totals.income) * 100)}% of what came in</small>}
         </div>
       </div>
 

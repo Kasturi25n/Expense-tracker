@@ -48,6 +48,6 @@ describe('auth', () => {
     expect(cats.find((c) => c.name === 'Salary')).toMatchObject({ kind: 'income' });
     expect(cats).toHaveLength(17);
     expect(db.prepare('SELECT name, type FROM accounts WHERE user_id = ?').all(userId)).toEqual([{ name: 'Cash', type: 'cash' }]);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM category_rules WHERE user_id = ?').get(userId).n).toBe(26);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM category_rules WHERE user_id = ?').get(userId).n).toBe(27);
   });
 });

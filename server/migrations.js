@@ -122,7 +122,30 @@ function seedExistingUsers(db) {
   for (const { id } of db.prepare('SELECT id FROM users').all()) seedStarterData(db, id);
 }
 
-const MIGRATIONS = [(db) => db.exec(LEGACY_SCHEMA), migrateToPart1, seedExistingUsers];
+const IMPORT_SCHEMA = `
+  CREATE TABLE imports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    account_id INTEGER NOT NULL REFERENCES accounts(id),
+    file_name TEXT NOT NULL,
+    row_count INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE import_formats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    signature TEXT NOT NULL,
+    header_row INTEGER NOT NULL,
+    mapping TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (user_id, signature)
+  );
+  ALTER TABLE transactions ADD COLUMN import_id INTEGER REFERENCES imports(id);
+`;
+
+// v5 re-runs the (idempotent) starter seed so existing users get rules added later, e.g. "salary".
+const MIGRATIONS = [(db) => db.exec(LEGACY_SCHEMA), migrateToPart1, seedExistingUsers, (db) => db.exec(IMPORT_SCHEMA), seedExistingUsers];
 
 export function migrate(db) {
   const { user_version: current } = db.prepare('PRAGMA user_version').get();

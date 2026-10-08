@@ -29,6 +29,7 @@ const STARTER_RULES = {
   Entertainment: ['netflix', 'hotstar', 'spotify', 'prime video', 'bookmyshow'],
   'Bills & Utilities': ['airtel', 'jio', 'bescom', 'electricity'],
   Health: ['apollo', 'pharmeasy', '1mg'],
+  Salary: ['salary'],
 };
 
 // Adds whatever starter data the user is missing, so it is safe for new and existing users alike.
@@ -46,7 +47,7 @@ export function seedStarterData(db, userId) {
 
   const ids = {};
   for (const [name, color] of EXPENSE_CATEGORIES) ids[name] = ensureCategory(name, color, 'expense');
-  for (const [name, color] of INCOME_CATEGORIES) ensureCategory(name, color, 'income');
+  for (const [name, color] of INCOME_CATEGORIES) ids[name] = ensureCategory(name, color, 'income');
 
   const words = new Set(db.prepare('SELECT match_text FROM category_rules WHERE user_id = ?').all(userId).map((r) => r.match_text));
   const insertRule = db.prepare('INSERT INTO category_rules (user_id, match_text, category_id) VALUES (?, ?, ?)');

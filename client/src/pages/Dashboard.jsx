@@ -6,24 +6,26 @@ import { useQuickAdd } from '../context/QuickAddContext.jsx';
 import { api } from '../api.js';
 import { formatMoney, formatShortDate, monthRange } from '../format.js';
 import { InsightCard } from '../components/InsightCard.jsx';
+import { AccountPicker, scopeLabel } from '../components/AccountPicker.jsx';
 
 export function Dashboard() {
   const { token } = useAuth();
   const { open, version } = useQuickAdd();
   const [data, setData] = useState(null);
+  const [accountId, setAccountId] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
     const months = [-5, -4, -3, -2, -1, 0].map(monthRange);
     const current = months[months.length - 1];
     Promise.all([
-      Promise.all(months.map((m) => api.getSummary(token, m.from, m.to))),
+      Promise.all(months.map((m) => api.getSummary(token, m.from, m.to, accountId))),
       api.getCategories(token),
       api.getRecurring(token),
       api.getUpcoming(token, 7),
       api.getBudgetStatus(token, current.from.slice(0, 7)),
       api.getTransactions(token, { limit: 1 }),
-      api.getInsights(token, current.from.slice(0, 7)),
+      api.getInsights(token, current.from.slice(0, 7), accountId),
     ])
       .then(([history, categories, recurring, upcoming, budgets, anyTx, report]) =>
         setData({
@@ -38,7 +40,7 @@ export function Dashboard() {
         })
       )
       .catch((e) => setError(e.message));
-  }, [token, version]);
+  }, [token, version, accountId]);
 
   if (error) return <div className="page"><p className="error">{error}</p></div>;
   if (!data) return <div className="page"><p className="hint">Loading…</p></div>;
@@ -66,13 +68,17 @@ export function Dashboard() {
     value: b.total,
     color: categoryOf(b.categoryId)?.color ?? '#a3a8b8',
   }));
-  const savingsRate = summary.income > 0 ? Math.round((summary.net / summary.income) * 100) : null;
+  const savingsRate = summary.income > 0 ? Math.trunc((summary.net / summary.income) * 100) : null;
   const overBudget = budgets.filter((b) => b.overBudget);
   const totalBalance = summary.accounts.reduce((sum, a) => sum + a.balance, 0);
 
   return (
     <div className="page">
-      <h1>This month</h1>
+      <div className="page-header">
+        <h1>This month</h1>
+        <AccountPicker accounts={summary.accounts} value={accountId} onChange={setAccountId} />
+      </div>
+      {scopeLabel(summary.accounts, accountId) && <p className="hint scope">{scopeLabel(summary.accounts, accountId)}</p>}
 
       {pending.length > 0 && (
         <div className="banner">
@@ -148,7 +154,11 @@ export function Dashboard() {
           <ul className="list">
             {summary.accounts.map((a) => (
               <li key={a.id}>
-                <span className="grow">{a.name}</span>
+                <span className="grow">
+                  {a.name}
+                  <br />
+                  <span className="hint">Spent {formatMoney(a.spent)} this month</span>
+                </span>
                 <span className={`amount ${a.balance < 0 ? 'negative' : ''}`}>{formatMoney(a.balance)}</span>
               </li>
             ))}

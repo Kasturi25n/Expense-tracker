@@ -26,7 +26,7 @@ describe('migrate', () => {
     const db = legacyDb();
     migrate(db);
 
-    expect(db.prepare('PRAGMA user_version').get().user_version).toBe(3);
+    expect(db.prepare('PRAGMA user_version').get().user_version).toBe(5);
     const accounts = db.prepare('SELECT user_id, name, type FROM accounts ORDER BY user_id').all();
     expect(accounts).toEqual([
       { user_id: 1, name: 'Cash', type: 'cash' },
@@ -53,6 +53,18 @@ describe('migrate', () => {
     expect(db.prepare('SELECT COUNT(*) AS n FROM categories WHERE user_id = 2').get().n).toBe(17);
   });
 
+  it('adds the salary rule for users who were set up before it existed', () => {
+    const db = new DatabaseSync(':memory:');
+    db.exec("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))");
+    db.exec("INSERT INTO users (email, password_hash) VALUES ('a@x.com', 'h')");
+    migrate(db);
+    db.exec("DELETE FROM category_rules WHERE match_text = 'salary'");
+    db.exec('PRAGMA user_version = 4');
+    migrate(db);
+    const salary = db.prepare("SELECT id FROM categories WHERE user_id = 1 AND name = 'Salary'").get().id;
+    expect(suggestCategory(db, 1, { payee: 'Acme', note: 'NEFT-ACME-SALARY', type: 'income' })).toBe(salary);
+  });
+
   it('does not duplicate starter categories a user already has', () => {
     const db = legacyDb();
     db.exec("INSERT INTO categories (user_id, name) VALUES (1, 'groceries')");
@@ -70,7 +82,12 @@ describe('migrate', () => {
   it('builds the full schema on an empty database', () => {
     const db = new DatabaseSync(':memory:');
     migrate(db);
+    expect(db.prepare('PRAGMA user_version').get().user_version).toBe(5);
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map((t) => t.name);
-    expect(tables).toEqual(['accounts', 'budgets', 'categories', 'category_rules', 'recurring_rules', 'tags', 'transaction_tags', 'transactions', 'users']);
+    expect(tables).toEqual([
+      'accounts', 'budgets', 'categories', 'category_rules', 'import_formats', 'imports',
+      'recurring_rules', 'tags', 'transaction_tags', 'transactions', 'users',
+    ]);
+    expect(db.prepare('PRAGMA table_info(transactions)').all().map((c) => c.name)).toContain('import_id');
   });
 });

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../api.js';
 import { formatMoney } from '../format.js';
@@ -80,6 +81,7 @@ export function Accounts() {
         <span className={`amount ${a.balance < 0 ? 'negative' : ''}`}>
           {a.type === 'credit_card' && a.balance < 0 ? `You owe ${formatMoney(-a.balance)}` : formatMoney(a.balance)}
         </span>
+        {!a.archived && <Link className="button-link secondary" to={`/import?accountId=${a.id}`}>Import</Link>}
         <button className="secondary" onClick={() => setEditing({ ...a })}>Edit</button>
         <button className="secondary" onClick={() => update(a, { archived: !a.archived })}>{a.archived ? 'Restore' : 'Archive'}</button>
         <button className="danger" onClick={() => remove(a)}>Delete</button>

@@ -56,8 +56,14 @@ export const api = {
   confirmRecurring: (token, id, body) => request(`/recurring/${id}/confirm`, { method: 'POST', body, token }),
   skipRecurring: (token, id) => request(`/recurring/${id}/skip`, { method: 'POST', token }),
 
-  getSummary: (token, from, to) => request(`/summary${query({ from, to })}`, { token }),
-  getInsights: (token, month) => request(`/insights${query({ month })}`, { token }),
+  getSummary: (token, from, to, accountId) => request(`/summary${query({ from, to, accountId })}`, { token }),
+  getInsights: (token, month, accountId) => request(`/insights${query({ month, accountId })}`, { token }),
+
+  readStatement: (token, fileName, fileBase64) => request('/imports/read', { method: 'POST', body: { fileName, fileBase64 }, token }),
+  previewImport: (token, body) => request('/imports/preview', { method: 'POST', body, token }),
+  createImport: (token, body) => request('/imports', { method: 'POST', body, token }),
+  getImports: (token) => request('/imports', { token }),
+  undoImport: (token, id) => request(`/imports/${id}`, { method: 'DELETE', token }),
 
   getBudgetStatus: (token, month) => request(`/budgets/status/${month}`, { token }),
   createBudget: (token, budget) => request('/budgets', { method: 'POST', body: budget, token }),

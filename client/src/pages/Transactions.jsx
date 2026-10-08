@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useQuickAdd } from '../context/QuickAddContext.jsx';
 import { api } from '../api.js';
@@ -99,7 +99,10 @@ export function Transactions() {
     <div className="page">
       <div className="page-header">
         <h1>Transactions</h1>
-        <button className="secondary" onClick={exportCsv}>Export CSV</button>
+        <div className="row">
+          <Link to="/import" className="button-link">Import statement</Link>
+          <button className="secondary" onClick={exportCsv}>Export CSV</button>
+        </div>
       </div>
 
       <div className="filters">
@@ -138,7 +141,10 @@ export function Transactions() {
           ) : (
             <>
               <p>Nothing logged yet.</p>
-              <button onClick={() => open()}>Add your first transaction</button>
+              <div className="row" style={{ justifyContent: 'center' }}>
+                <button onClick={() => open()}>Add your first transaction</button>
+                <Link to="/import">or import a bank statement</Link>
+              </div>
             </>
           )}
         </div>

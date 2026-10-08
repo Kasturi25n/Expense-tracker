@@ -50,6 +50,10 @@ describe('suggestCategory', () => {
     expect(suggestCategory(db, userId, { payee: 'Swiggy', type: 'expense' })).toBe(id('Food & Dining'));
   });
 
+  it('files salary credits under Salary from the bank narration', () => {
+    expect(suggestCategory(db, userId, { payee: 'Acme Corp', note: 'NEFT CR-HDFC0000001-ACME CORP-SALARY', type: 'income' })).toBe(id('Salary'));
+  });
+
   it('returns null for transfers and unknown payees', () => {
     expect(suggestCategory(db, userId, { payee: 'Swiggy', type: 'transfer' })).toBeNull();
     expect(suggestCategory(db, userId, { payee: 'Someone new', type: 'expense' })).toBeNull();

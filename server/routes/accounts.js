@@ -60,6 +60,8 @@ export function createAccountsRouter(db) {
       )
       .get(id, id, id, id);
     if (n) return res.status(409).json({ error: 'This account has transactions. Archive it instead to hide it.' });
+    // Import batches whose transactions were all deleted by hand still point at the account.
+    db.prepare('DELETE FROM imports WHERE account_id = ?').run(id);
     db.prepare('DELETE FROM accounts WHERE id = ?').run(id);
     res.status(204).end();
   });

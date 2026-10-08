@@ -34,6 +34,32 @@ describe('summary', () => {
     expect(res.body.accounts.map((a) => [a.name, a.balance])).toEqual([['Cash', 3750.7], ['HDFC', 44000]]);
   });
 
+  it('shows money out per account for the period', async () => {
+    const bank = (await api.post('/api/accounts', { name: 'HDFC', type: 'bank' })).body.id;
+    addTx(db, userId, { amount: 700, occurredAt: '2026-10-05', accountId: bank });
+    addTx(db, userId, { amount: 300, occurredAt: '2026-10-06', accountId: cash });
+    addTx(db, userId, { amount: 999, occurredAt: '2026-09-30', accountId: cash });
+    addTx(db, userId, { type: 'transfer', amount: 5000, occurredAt: '2026-10-02', accountId: bank, toAccountId: cash });
+    const res = await api.get('/api/summary?from=2026-10-01&to=2026-10-31');
+    expect(res.body.accounts.map((a) => [a.name, a.spent])).toEqual([['Cash', 300], ['HDFC', 700]]);
+  });
+
+  it('limits totals to one account when asked', async () => {
+    const bank = (await api.post('/api/accounts', { name: 'HDFC', type: 'bank' })).body.id;
+    addTx(db, userId, { type: 'income', amount: 50000, occurredAt: '2026-10-01', accountId: bank });
+    addTx(db, userId, { amount: 700, occurredAt: '2026-10-05', accountId: bank });
+    addTx(db, userId, { amount: 300, occurredAt: '2026-10-06', accountId: cash });
+    const res = await api.get(`/api/summary?from=2026-10-01&to=2026-10-31&accountId=${bank}`);
+    expect(res.body).toMatchObject({ income: 50000, expense: 700, net: 49300 });
+    expect(res.body.byCategory).toEqual([{ categoryId: null, total: 700 }]);
+  });
+
+  it("rejects an account that isn't yours", async () => {
+    const other = await signup(app, 'other@example.com');
+    const res = await api.get(`/api/summary?from=2026-10-01&to=2026-10-31&accountId=${cashId(db, other.userId)}`);
+    expect(res.status).toBe(400);
+  });
+
   it('requires valid from and to dates', async () => {
     expect((await api.get('/api/summary')).status).toBe(400);
     expect((await api.get('/api/summary?from=2026-10-01&to=Oct')).status).toBe(400);
