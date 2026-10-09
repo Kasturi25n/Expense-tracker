@@ -69,6 +69,16 @@ export const api = {
   createBudget: (token, budget) => request('/budgets', { method: 'POST', body: budget, token }),
   deleteBudget: (token, id) => request(`/budgets/${id}`, { method: 'DELETE', token }),
 
+  getGoals: (token) => request('/goals', { token }),
+  createGoal: (token, goal) => request('/goals', { method: 'POST', body: goal, token }),
+  updateGoal: (token, id, goal) => request(`/goals/${id}`, { method: 'PUT', body: goal, token }),
+  deleteGoal: (token, id) => request(`/goals/${id}`, { method: 'DELETE', token }),
+  addGoalMoney: (token, id, body) => request(`/goals/${id}/contributions`, { method: 'POST', body, token }),
+  removeGoalMoney: (token, id, entryId) => request(`/goals/${id}/contributions/${entryId}`, { method: 'DELETE', token }),
+
+  getBackup: (token) => request('/backup', { token }),
+  restoreBackup: (token, file, preview) => request(`/backup/restore${preview ? '?dryRun=1' : ''}`, { method: 'POST', body: file, token }),
+
   exportCsv: async (token) => {
     const res = await fetch(`${BASE_URL}/export/csv`, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) throw new Error('Export failed');

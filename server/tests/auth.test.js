@@ -50,4 +50,19 @@ describe('auth', () => {
     expect(db.prepare('SELECT name, type FROM accounts WHERE user_id = ?').all(userId)).toEqual([{ name: 'Cash', type: 'cash' }]);
     expect(db.prepare('SELECT COUNT(*) AS n FROM category_rules WHERE user_id = ?').get(userId).n).toBe(27);
   });
+  it('treats emails the same whatever their case or spacing', async () => {
+    const { app } = freshApp();
+    await request(app).post('/api/auth/register').send({ email: 'Me@Example.com', password: 'password123' });
+    const dup = await request(app).post('/api/auth/register').send({ email: ' me@example.com ', password: 'password123' });
+    expect(dup.status).toBe(409);
+    const login = await request(app).post('/api/auth/login').send({ email: 'ME@example.COM', password: 'password123' });
+    expect(login.status).toBe(200);
+    expect(login.body.user.email).toBe('me@example.com');
+  });
+
+  it('answers a non-text password with 400, not a crash', async () => {
+    const { app } = freshApp();
+    expect((await request(app).post('/api/auth/register').send({ email: 'a@b.co', password: 12345678 })).status).toBe(400);
+    expect((await request(app).post('/api/auth/login').send({ email: 'a@b.co', password: { x: 1 } })).status).toBe(400);
+  });
 });

@@ -100,13 +100,13 @@ function ReportBody({ report, categoryName }) {
         <div className="card">
           <h2>This month's pace</h2>
           <p>
-            Spent so far <strong>{formatMoney(pace.spentSoFar)}</strong> · heading for <strong>{formatMoney(pace.forecast)}</strong>
+            Spent so far <strong>{formatMoney(pace.spentSoFar)}</strong> · heading for <strong>{formatMoney(Math.round(pace.forecast))}</strong>
             {pace.limit !== null && <> · limit {formatMoney(pace.limit)} ({LIMIT_LABELS[pace.limitSource]})</>}
           </p>
           {pace.safePerDay !== null && (
             <p className="hint">
               {pace.safePerDay > 0
-                ? `You can spend about ${formatMoney(pace.safePerDay)} a day for the next ${pace.daysLeft} days.`
+                ? `You can spend about ${formatMoney(Math.floor(pace.safePerDay))} a day for the next ${pace.daysLeft} days.`
                 : "There's no room left in this month's limit."}
             </p>
           )}

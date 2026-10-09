@@ -7,6 +7,7 @@ import { api } from '../api.js';
 import { formatMoney, formatShortDate, monthRange } from '../format.js';
 import { InsightCard } from '../components/InsightCard.jsx';
 import { AccountPicker, scopeLabel } from '../components/AccountPicker.jsx';
+import { GoalProgress } from '../components/GoalProgress.jsx';
 
 export function Dashboard() {
   const { token } = useAuth();
@@ -26,8 +27,9 @@ export function Dashboard() {
       api.getBudgetStatus(token, current.from.slice(0, 7)),
       api.getTransactions(token, { limit: 1 }),
       api.getInsights(token, current.from.slice(0, 7), accountId),
+      api.getGoals(token),
     ])
-      .then(([history, categories, recurring, upcoming, budgets, anyTx, report]) =>
+      .then(([history, categories, recurring, upcoming, budgets, anyTx, report, goals]) =>
         setData({
           summary: history[history.length - 1],
           history: history.map((h, i) => ({ month: months[i].label, 'Money in': h.income, 'Money out': h.expense })),
@@ -37,6 +39,7 @@ export function Dashboard() {
           budgets,
           hasTransactions: anyTx.total > 0,
           insights: report.insights,
+          goals: goals.filter((g) => g.status !== 'reached').slice(0, 3),
         })
       )
       .catch((e) => setError(e.message));
@@ -45,7 +48,7 @@ export function Dashboard() {
   if (error) return <div className="page"><p className="error">{error}</p></div>;
   if (!data) return <div className="page"><p className="hint">Loading…</p></div>;
 
-  const { summary, history, categories, pending, upcoming, budgets, hasTransactions, insights } = data;
+  const { summary, history, categories, pending, upcoming, budgets, hasTransactions, insights, goals } = data;
   if (!hasTransactions) {
     return (
       <div className="page">
@@ -73,83 +76,49 @@ export function Dashboard() {
   const totalBalance = summary.accounts.reduce((sum, a) => sum + a.balance, 0);
 
   return (
-    <div className="page">
+    <div className="page wide">
       <div className="page-header">
         <h1>This month</h1>
         <AccountPicker accounts={summary.accounts} value={accountId} onChange={setAccountId} />
       </div>
       {scopeLabel(summary.accounts, accountId) && <p className="hint scope">{scopeLabel(summary.accounts, accountId)}</p>}
 
-      {pending.length > 0 && (
-        <div className="banner">
-          <span>{pending.length === 1 ? '1 bill is' : `${pending.length} bills are`} waiting for you to confirm the amount.</span>
-          <Link to="/recurring">Review</Link>
-        </div>
-      )}
-      {overBudget.map((b) => (
-        <div key={b.id} className="banner danger">
-          <span>
-            Over budget in {b.category_id === null ? 'total spending' : categoryOf(b.category_id)?.name}: {formatMoney(b.spent)} of {formatMoney(b.amount)}
-          </span>
-          <Link to="/budgets">Budgets</Link>
-        </div>
-      ))}
-
-      {insights.length > 0 && (
-        <div className="card">
-          <div className="row spread">
-            <h2>Insights</h2>
-            <Link to="/insights">See all insights →</Link>
+      <div className="bento">
+        {pending.length > 0 && (
+          <div className="banner">
+            <span>{pending.length === 1 ? '1 bill is' : `${pending.length} bills are`} waiting for you to confirm the amount.</span>
+            <Link to="/recurring">Review</Link>
           </div>
-          {insights.slice(0, 3).map((insight) => <InsightCard key={insight.id} insight={insight} />)}
-        </div>
-      )}
+        )}
+        {overBudget.map((b) => (
+          <div key={b.id} className="banner danger">
+            <span>
+              Over budget in {b.category_id === null ? 'total spending' : categoryOf(b.category_id)?.name}: {formatMoney(b.spent)} of {formatMoney(b.amount)}
+            </span>
+            <Link to="/budgets">Budgets</Link>
+          </div>
+        ))}
 
-      <div className="stats">
-        <div className="stat"><span>Money in</span><strong className="amount income">{formatMoney(summary.income)}</strong></div>
-        <div className="stat"><span>Money out</span><strong>{formatMoney(summary.expense)}</strong></div>
-        <div className="stat">
-          <span>{summary.net >= 0 ? 'Saved' : 'Overspent'}</span>
-          <strong className={summary.net < 0 ? 'amount negative' : ''}>{formatMoney(Math.abs(summary.net))}</strong>
-          {savingsRate !== null && <small>{savingsRate}% of what came in</small>}
+        <div className="stats">
+          <div className="stat"><span>Money in</span><strong className="amount income">{formatMoney(summary.income)}</strong></div>
+          <div className="stat"><span>Money out</span><strong>{formatMoney(summary.expense)}</strong></div>
+          <div className="stat">
+            <span>{summary.net >= 0 ? 'Saved' : 'Overspent'}</span>
+            <strong className={summary.net < 0 ? 'amount negative' : ''}>{formatMoney(Math.abs(summary.net))}</strong>
+            {savingsRate !== null && <small>{savingsRate}% of what came in</small>}
+          </div>
         </div>
-      </div>
 
-      <div className="grid">
-        <div className="card">
-          <h2>Where it went</h2>
-          {pieData.length ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={95}>
-                  {pieData.map((d) => <Cell key={d.name} fill={d.color} />)}
-                </Pie>
-                <Tooltip formatter={(v) => formatMoney(v)} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="hint">No spending logged this month yet.</p>
-          )}
-        </div>
-        <div className="card">
-          <h2>Last 6 months</h2>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={history}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="month" />
-              <YAxis tickFormatter={(v) => `₹${Math.round(v / 1000)}k`} width={50} />
-              <Tooltip formatter={(v) => formatMoney(v)} />
-              <Legend />
-              <Bar dataKey="Money in" fill="#15803d" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Money out" fill="#3b6ef5" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="grid">
-        <div className="card">
+        {insights.length > 0 && (
+          <div className="card span-8">
+            <div className="row spread">
+              <h2>Insights</h2>
+              <Link to="/insights">See all insights →</Link>
+            </div>
+            {insights.slice(0, 3).map((insight) => <InsightCard key={insight.id} insight={insight} />)}
+          </div>
+        )}
+        <div className={`card tile-dark ${insights.length > 0 ? 'span-4' : ''}`}>
           <h2>Accounts</h2>
           <ul className="list">
             {summary.accounts.map((a) => (
@@ -165,7 +134,39 @@ export function Dashboard() {
           </ul>
           <p className="hint">Total across accounts: {formatMoney(totalBalance)}</p>
         </div>
-        <div className="card">
+
+        <div className="card span-5">
+          <h2>Where it went</h2>
+          {pieData.length ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={95}>
+                  {pieData.map((d) => <Cell key={d.name} fill={d.color} />)}
+                </Pie>
+                <Tooltip formatter={(v) => formatMoney(v)} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="hint">No spending logged this month yet.</p>
+          )}
+        </div>
+        <div className="card span-7">
+          <h2>Last 6 months</h2>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={history}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="month" />
+              <YAxis tickFormatter={(v) => `₹${Math.round(v / 1000)}k`} width={50} />
+              <Tooltip formatter={(v) => formatMoney(v)} />
+              <Legend />
+              <Bar dataKey="Money in" fill="#1b873f" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="Money out" fill="#181a20" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className={`card tile-sky ${goals.length > 0 ? 'span-4' : ''}`}>
           <h2>Coming up in 7 days</h2>
           {upcoming.length ? (
             <ul className="list">
@@ -183,6 +184,23 @@ export function Dashboard() {
             </p>
           )}
         </div>
+        {goals.length > 0 && (
+          <div className="card span-8">
+            <div className="row spread">
+              <h2>Goals</h2>
+              <Link to="/goals">All goals →</Link>
+            </div>
+            <div className="goal-tiles">
+              {goals.map((g) => (
+                <div key={g.id} className="goal-tile">
+                  <strong>{g.name}</strong>
+                  <GoalProgress goal={g} />
+                  {g.perMonth !== null && <small className="hint">{formatMoney(g.perMonth)} a month to get there</small>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

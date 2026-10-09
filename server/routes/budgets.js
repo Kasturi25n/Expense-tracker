@@ -17,13 +17,21 @@ export function createBudgetsRouter(db) {
 
   router.post('/', (req, res) => {
     const { categoryId, month, amount } = req.body ?? {};
-    if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+    if (!month || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
       return res.status(400).json({ error: 'Month is required in YYYY-MM format' });
     }
     if (typeof amount !== 'number' || Number.isNaN(amount) || amount <= 0) {
       return res.status(400).json({ error: 'A positive numeric amount is required' });
     }
     if (categoryId !== undefined && categoryId !== null) ownedCategory(db, req.userId, categoryId, 'expense');
+    // One budget per category per month: setting it again changes the limit instead of adding a second row.
+    const existing = db
+      .prepare('SELECT id FROM budgets WHERE user_id = ? AND month = ? AND category_id IS ?')
+      .get(req.userId, month, categoryId ?? null);
+    if (existing) {
+      db.prepare('UPDATE budgets SET amount = ? WHERE id = ?').run(amount, existing.id);
+      return res.json(db.prepare('SELECT * FROM budgets WHERE id = ?').get(existing.id));
+    }
     const info = db
       .prepare('INSERT INTO budgets (user_id, category_id, month, amount) VALUES (?, ?, ?, ?)')
       .run(req.userId, categoryId ?? null, month, amount);

@@ -13,6 +13,8 @@ import { Accounts } from './pages/Accounts.jsx';
 import { Insights } from './pages/Insights.jsx';
 import { Import } from './pages/Import.jsx';
 import { Recurring } from './pages/Recurring.jsx';
+import { Goals } from './pages/Goals.jsx';
+import { Backup } from './pages/Backup.jsx';
 import './App.css';
 
 const guard = (page) => <ProtectedRoute>{page}</ProtectedRoute>;
@@ -31,6 +33,8 @@ function App() {
             <Route path="/insights" element={guard(<Insights />)} />
             <Route path="/import" element={guard(<Import />)} />
             <Route path="/budgets" element={guard(<Budgets />)} />
+            <Route path="/goals" element={guard(<Goals />)} />
+            <Route path="/backup" element={guard(<Backup />)} />
             <Route path="/recurring" element={guard(<Recurring />)} />
             <Route path="/accounts" element={guard(<Accounts />)} />
             <Route path="/categories" element={guard(<Categories />)} />

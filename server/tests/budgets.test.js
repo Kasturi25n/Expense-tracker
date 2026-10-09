@@ -39,4 +39,16 @@ describe('budgets', () => {
   it('rejects an invalid month format', async () => {
     expect((await api.post('/api/budgets', { month: 'not-a-month', amount: 50 })).status).toBe(400);
   });
+  it('changes the limit instead of adding a second budget for the same category and month', async () => {
+    const food = (await api.post('/api/categories', { name: 'Food' })).body.id;
+    await api.post('/api/budgets', { month: '2026-09', amount: 100 });
+    const again = await api.post('/api/budgets', { month: '2026-09', amount: 250 });
+    expect(again.status).toBe(200);
+    await api.post('/api/budgets', { categoryId: food, month: '2026-09', amount: 50 });
+    await api.post('/api/budgets', { categoryId: food, month: '2026-09', amount: 75 });
+    await api.post('/api/budgets', { month: '2026-10', amount: 300 });
+    const sept = (await api.get('/api/budgets?month=2026-09')).body;
+    expect(sept.map((b) => [b.category_id, b.amount])).toEqual([[null, 250], [food, 75]]);
+    expect((await api.post('/api/budgets', { month: '2026-13', amount: 50 })).status).toBe(400);
+  });
 });

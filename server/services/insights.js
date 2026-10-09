@@ -1,4 +1,5 @@
 import { addDays, addPeriod, occurrencesBetween } from './recurring.js';
+import { listGoals } from './goals.js';
 
 // Thresholds (spec §2). Tune here.
 const PACE_MIN_DAY = 3;
@@ -24,6 +25,7 @@ const WEEKEND_MIN_TOTAL = 2000;
 const LATE_NIGHT_MIN_COUNT = 4;
 const GOOD_SAVINGS_RATE = 0.2;
 const SAVINGS_IMPROVEMENT_POINTS = 5;
+const MAX_GOAL_INSIGHTS = 2;
 
 const TONE_ORDER = { warning: 0, info: 1, good: 2 };
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -458,7 +460,25 @@ function savingsInsights(db, who, ctx) {
   }];
 }
 
-const DETECTORS = [changeInsights, leakInsights, unusualInsights, subscriptionInsights, habitInsights, savingsInsights];
+// Goals are a whole-household tally, so they only show for the current month across all accounts.
+function goalInsights(db, who, ctx) {
+  if (!ctx.isCurrent || who.accountId !== null) return [];
+  return listGoals(db, who.userId, ctx.today)
+    .filter((g) => g.status === 'behind' || g.status === 'overdue')
+    .sort((x, y) => y.remaining - x.remaining)
+    .slice(0, MAX_GOAL_INSIGHTS)
+    .map((g) => ({
+      id: `goal-${g.id}`, tone: 'info', impact: g.remaining,
+      title: g.status === 'overdue' ? `"${g.name}" is past its deadline` : `"${g.name}" is behind plan`,
+      detail:
+        g.status === 'overdue'
+          ? `${fm(g.saved)} of ${fm(g.target_amount)} saved. Add the remaining ${fm(g.remaining)} or pick a new deadline.`
+          : `${fm(g.saved)} of ${fm(g.target_amount)} saved. Putting aside ${fm(g.perMonth)} a month gets you there by ${shortDate(g.target_date)}.`,
+      action: { label: 'Open goals', to: '/goals' },
+    }));
+}
+
+const DETECTORS = [changeInsights, leakInsights, unusualInsights, subscriptionInsights, habitInsights, savingsInsights, goalInsights];
 
 export function buildMonthReport(db, userId, month, today, accountId = null) {
   const who = { userId, accountId };

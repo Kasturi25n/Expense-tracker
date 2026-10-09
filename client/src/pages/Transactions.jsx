@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useQuickAdd } from '../context/QuickAddContext.jsx';
@@ -46,10 +46,14 @@ export function Transactions() {
       .catch((e) => setError(e.message));
   }, [token, version]);
 
+  // Typing in search fires several requests; only the newest answer is shown.
+  const latestRequest = useRef(0);
   const load = useCallback(
     (offset = 0) => {
+      const request = (latestRequest.current += 1);
       api.getTransactions(token, { ...filters, limit: PAGE_SIZE, offset })
         .then((page) => {
+          if (request !== latestRequest.current) return;
           setItems((prev) => (offset === 0 ? page.items : [...prev, ...page.items]));
           setTotal(page.total);
           setLoaded(true);
@@ -60,7 +64,8 @@ export function Transactions() {
   );
 
   useEffect(() => {
-    load(0);
+    const timer = setTimeout(() => load(0), 200);
+    return () => clearTimeout(timer);
   }, [load, version]);
 
   const setFilter = (field) => (e) => setFilters((f) => ({ ...f, [field]: e.target.value }));
@@ -155,7 +160,13 @@ export function Transactions() {
           <h3>{formatDay(group.day)}</h3>
           <ul className="tx-list">
             {group.items.map((tx) => (
-              <li key={tx.id} className="tx-row" onClick={() => open(tx)}>
+              <li key={tx.id} className="tx-row" role="button" tabIndex={0} onClick={() => open(tx)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' || e.target !== e.currentTarget) return;
+                  // Stops the same key press from also submitting the form that opens.
+                  e.preventDefault();
+                  open(tx);
+                }}>
                 <div className="tx-main">
                   <span className="tx-title">{title(tx)}</span>
                   <span className="tx-meta">

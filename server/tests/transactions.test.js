@@ -122,4 +122,12 @@ describe('transactions', () => {
     await api.post('/api/transactions', expense({ tags: ['goa-trip', 'office'] }));
     expect((await api.get('/api/transactions/tags')).body).toEqual([{ name: 'goa-trip', uses: 2 }, { name: 'office', uses: 1 }]);
   });
+  it("rejects dates the calendar doesn't have", async () => {
+    const accountId = db.prepare('SELECT id FROM accounts LIMIT 1').get().id;
+    const post = (occurredAt) => api.post('/api/transactions', { type: 'expense', amount: 10, accountId, occurredAt });
+    expect((await post('2026-13-45')).status).toBe(400);
+    expect((await post('2026-02-30')).status).toBe(400);
+    expect((await post('2026-10-05T25:00')).status).toBe(400);
+    expect((await post('2028-02-29T23:59')).status).toBe(201);
+  });
 });

@@ -1,6 +1,8 @@
 const rupee = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
+const wholeRupee = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
 
-export const formatMoney = (amount) => rupee.format(amount);
+// Paise are shown only when there are some: ₹450, but ₹99.50.
+export const formatMoney = (amount) => (Number.isInteger(Math.round(amount * 100) / 100) ? wholeRupee : rupee).format(amount);
 
 export function signedMoney(tx) {
   if (tx.type === 'income') return `+${formatMoney(tx.amount)}`;

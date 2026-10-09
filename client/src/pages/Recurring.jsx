@@ -105,6 +105,7 @@ export function Recurring() {
     e.preventDefault();
     if (!(parseFloat(form.amount) > 0)) return setError('Enter an amount greater than 0');
     if (!form.accountId) return setError('Pick an account');
+    if (form.type === 'transfer' && !form.toAccountId) return setError('Pick the account the money goes to');
     const body = toBody(form);
     const ok = await run(() => (form.id ? api.updateRecurring(token, form.id, { ...body, active: Boolean(form.active) }) : api.createRecurring(token, body)));
     if (ok) setForm(null);
@@ -252,7 +253,8 @@ export function Recurring() {
                 </span>
                 <span className={`amount ${r.type}`}>{formatMoney(r.amount)}</span>
                 <button className="secondary" onClick={() => setForm(ruleToForm(r))}>Edit</button>
-                <button className="secondary" onClick={() => toggle(r)}>{r.active ? 'Pause' : 'Resume'}</button>
+                <button className="secondary" disabled={status(r) === 'ended'} title={status(r) === 'ended' ? 'This item has ended. Edit it and change the end date to restart it.' : undefined}
+                  onClick={() => toggle(r)}>{r.active ? 'Pause' : 'Resume'}</button>
                 <button className="danger" onClick={() => remove(r)}>Delete</button>
               </li>
             ))}

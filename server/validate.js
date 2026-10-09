@@ -11,16 +11,26 @@ export function requireAmount(amount) {
   }
 }
 
+// Rejects dates the calendar doesn't have, like 2026-02-30 or month 13.
+function isRealDate(value) {
+  const [y, m, d] = value.slice(0, 10).split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+}
+
 export function requireDateTime(value) {
   if (typeof value !== 'string' || !DATE_TIME_RE.test(value)) {
     throw new ValidationError('Date must look like 2026-10-05 or 2026-10-05T13:30');
   }
+  const [h, min] = value.includes('T') ? value.slice(11).split(':').map(Number) : [0, 0];
+  if (!isRealDate(value) || h > 23 || min > 59) throw new ValidationError(`${value} is not a real date`);
 }
 
 export function requireDate(value, label = 'Date') {
   if (typeof value !== 'string' || !DATE_RE.test(value)) {
     throw new ValidationError(`${label} must look like 2026-10-05`);
   }
+  if (!isRealDate(value)) throw new ValidationError(`${label} ${value} is not a real date`);
 }
 
 export function requireOneOf(value, options, label) {

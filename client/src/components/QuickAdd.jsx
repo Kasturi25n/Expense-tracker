@@ -81,11 +81,14 @@ export function QuickAdd({ initial, onClose, onSaved }) {
     if (!(amount > 0)) return setError('Enter an amount greater than 0');
     if (!form.accountId) return setError('Pick an account');
     if (form.type === 'transfer' && !form.toAccountId) return setError('Pick the account the money went to');
+    if (form.type === 'transfer' && String(form.toAccountId) === String(form.accountId)) return setError('Pick two different accounts');
 
+    // An entry saved without a time (e.g. from a bank statement) stays that way unless a time is set.
+    const keepsNoTime = isEdit && !initial.occurred_at.includes('T') && form.occurredAt.endsWith('T00:00');
     const body = {
       type: form.type,
       amount,
-      occurredAt: form.occurredAt,
+      occurredAt: keepsNoTime ? form.occurredAt.slice(0, 10) : form.occurredAt,
       accountId: Number(form.accountId),
       toAccountId: form.type === 'transfer' ? Number(form.toAccountId) : null,
       payee: form.type === 'transfer' ? '' : form.payee.trim(),

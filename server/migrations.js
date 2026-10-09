@@ -144,8 +144,31 @@ const IMPORT_SCHEMA = `
   ALTER TABLE transactions ADD COLUMN import_id INTEGER REFERENCES imports(id);
 `;
 
+// Goal money is a separate tally: contributions never touch account balances.
+const GOALS_SCHEMA = `
+  CREATE TABLE goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    name TEXT NOT NULL,
+    target_amount REAL NOT NULL,
+    target_date TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE goal_contributions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    goal_id INTEGER NOT NULL REFERENCES goals(id),
+    amount REAL NOT NULL,
+    date TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`;
+
 // v5 re-runs the (idempotent) starter seed so existing users get rules added later, e.g. "salary".
-const MIGRATIONS = [(db) => db.exec(LEGACY_SCHEMA), migrateToPart1, seedExistingUsers, (db) => db.exec(IMPORT_SCHEMA), seedExistingUsers];
+const MIGRATIONS = [
+  (db) => db.exec(LEGACY_SCHEMA), migrateToPart1, seedExistingUsers, (db) => db.exec(IMPORT_SCHEMA), seedExistingUsers,
+  (db) => db.exec(GOALS_SCHEMA),
+];
 
 export function migrate(db) {
   const { user_version: current } = db.prepare('PRAGMA user_version').get();
